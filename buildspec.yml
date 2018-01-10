@@ -1,0 +1,14 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo install various pip tools
+  pre_build:
+    commands:
+      - echo sanity check?
+  build:
+    commands:
+      - python setup.py sdist
+  post_build:
+    commands:

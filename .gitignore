@@ -1,0 +1,10 @@
+dist/
+build/
+.cache/
+.tox/
+.eggs/
+aws_adfs_auth.egg-info/
+*.pyc
+__pycache__
+pipeline.cfg
+venv3.6/
