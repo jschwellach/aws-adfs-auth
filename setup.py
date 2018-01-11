@@ -43,7 +43,7 @@ setup(
     test_suite = 'tests.aws_adfs_auth_test_suite',
     classifiers=[
         'Development Status :: 4 - Beta',
-        'Environemtn :: Console',
+        'Environment :: Console',
         'Intended Audience :: End Users/Desktop',
         'Intended Audience :: Information Technology',
         'License :: OSI Approved :: Apache Software License',
