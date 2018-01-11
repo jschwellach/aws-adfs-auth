@@ -1,4 +1,4 @@
-from . import configure, abstract_adfs, utils
+from . import abstract_adfs
 
 class MicrosoftADFS:
 
