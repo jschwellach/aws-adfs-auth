@@ -4,8 +4,8 @@
 #from . import cli
 #from . import main
 
-VERSION = "0.2.0"
-BUILD_TIME = "2018-01-12 10:13:00"
+VERSION = "0.3.0"
+BUILD_TIME = "2018-01-26 01:25:00"
 
 __title__ = "aws_adfs_auth"
 __version__ = VERSION

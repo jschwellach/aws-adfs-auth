@@ -45,9 +45,11 @@ def main():
     else:
         logger.debug("running application with configuration")
         config = configure.open_config()
-        if config.get('provider','name') == 'Microsoft':
+        # migrating the configuration if necessary
+        configure.migrate(config)
+        if config.get('provider', 'name') == 'Microsoft':
             logger.info('Using Microsoft federation')
-            provider = ms_adfs.MicrosoftADFS(logger,config)
+            provider = ms_adfs.MicrosoftADFS(logger, config)
 
 
 if __name__ == '__main__':

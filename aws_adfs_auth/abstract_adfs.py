@@ -124,16 +124,24 @@ class AbstractADFS(object):
         awsconfig = configparser.RawConfigParser()
         awsconfig.read(filename)
 
-        # Put the credentials into a saml specific section instead of clobbering
-        # the default credentials
-        if not awsconfig.has_section('saml'):
-            awsconfig.add_section('saml')
+        # We are using the specified profile in the config file to write the credentials
+        profile = self.config.get('provider','profile_name')
 
-        awsconfig.set('saml', 'output', self.config.get('aws','outputformat'))
-        awsconfig.set('saml', 'region', self.config.get('aws','region'))
-        awsconfig.set('saml', 'aws_access_key_id', stsResponse['Credentials']['AccessKeyId'])
-        awsconfig.set('saml', 'aws_secret_access_key', stsResponse['Credentials']['SecretAccessKey'])
-        awsconfig.set('saml', 'aws_session_token', stsResponse['Credentials']['SessionToken'])
+        if not awsconfig.has_section(profile):
+            awsconfig.add_section(profile)
+        else:
+            # we should backup the profile ones
+            if not awsconfig.has_section(profile+'.backup'):
+                awsconfig.add_section(profile+'.backup')
+                items = awsconfig.items(profile)
+                for item in items:
+                    awsconfig.set(profile+'.backup', item[0], item[1])
+
+        awsconfig.set(profile, 'output', self.config.get('aws', 'outputformat'))
+        awsconfig.set(profile, 'region', self.config.get('aws', 'region'))
+        awsconfig.set(profile, 'aws_access_key_id', stsResponse['Credentials']['AccessKeyId'])
+        awsconfig.set(profile, 'aws_secret_access_key', stsResponse['Credentials']['SecretAccessKey'])
+        awsconfig.set(profile, 'aws_session_token', stsResponse['Credentials']['SessionToken'])
 
         # Write the updated config file
         with open(filename, 'w+') as configfile:
@@ -141,8 +149,8 @@ class AbstractADFS(object):
 
         # Give the user some basic info as to what has just happened
         print ('\n\n----------------------------------------------------------------')
-        print ('Your new access key pair has been stored in the AWS configuration file {0} under the saml profile.'.format(filename))
+        print ('Your new access key pair has been stored in the AWS configuration file {0} under the {1} profile.'.format(filename, profile))
         print ('Note that it will expire at {0}.'.format(stsResponse['Credentials']['Expiration']))
         print ('After this time, you may safely rerun this script to refresh your access key pair.')
-        print ('To use this credential, call the AWS CLI with the --profile option (e.g. aws --profile saml ec2 describe-instances).')
+        print ('To use this credential, call the AWS CLI with the --profile option (e.g. aws --profile saml ec2 describe-instances) unless you defined the default profile in configuration')
         print ('----------------------------------------------------------------\n\n')
