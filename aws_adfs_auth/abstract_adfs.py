@@ -1,12 +1,11 @@
-from requests import Session
 from robobrowser import RoboBrowser
+import sys
 import boto3
 import xml.etree.ElementTree as ET
-from os.path import expanduser
 import configparser
 import getpass
 import base64
-from . import configuration, utils
+from . import configuration
 
 
 class AbstractADFS(object):
@@ -19,10 +18,10 @@ class AbstractADFS(object):
         self.aws_accounts = config._sections['aws_accounts']
 
     def get_username_password(self):
-        print ('Please enter your federation credentials')
-        self.username = self.configure.input_and_set(self.config,'msadfs','username','Username')
+        print('Please enter your federation credentials')
+        self.username = self.configure.input_and_set(self.config, 'msadfs', 'username', 'Username')
         self.password = getpass.getpass()
-        print ('')
+        print('')
         return self.username, self.password
 
     def delete_username_password(self):
@@ -34,7 +33,7 @@ class AbstractADFS(object):
     def init_browser(self):
         # Using RoboBrowser to get the SAML token
         self.browser = RoboBrowser(parser='lxml')
-        self.browser.open(self.config.get('provider','idpentryurl'))
+        self.browser.open(self.config.get('provider', 'idpentryurl'))
         return self.browser
 
     def handle_saml(self):
@@ -47,17 +46,16 @@ class AbstractADFS(object):
         # analyzing the debug print lines above)
         for inputtag in browser.find_all('input'):
             if(inputtag.get('name') == 'SAMLResponse'):
-                #print(inputtag.get('value'))
                 assertion = inputtag.get('value')
 
         # Better error handling is required for production use.
         if (assertion == ''):
-            #TODO: Insert valid error checking/handling
-            print ('Response did not contain a valid SAML assertion')
+            # TODO: Insert valid error checking/handling
+            print('Response did not contain a valid SAML assertion')
             sys.exit(0)
 
         # Debug only
-        #print(base64.b64decode(assertion))
+        # print(base64.b64decode(assertion))
 
         # Parse the returned assertion and extract the authorized roles
         awsroles = []
@@ -80,25 +78,25 @@ class AbstractADFS(object):
 
         # If I have more than one role, ask the user which one they want,
         # otherwise just proceed
-        print ("")
+        print("")
         if len(awsroles) > 1:
             i = 0
-            print ("Please choose the role you would like to assume:")
+            print("Please choose the role you would like to assume:")
             for awsrole in awsroles:
                 role = awsrole.split(',')[0]
                 roleName = role.split(':')[5]
                 accountId = role.split(':')[4]
                 if accountId in self.aws_accounts:
-                    print ('[{:2d}]: {:10s} {:30s}:{:10s}'.format(i,accountId, self.aws_accounts.get(accountId),roleName))
+                    print('[{:2d}]: {:10s} {:30s}:{:10s}'.format(i, accountId, self.aws_accounts.get(accountId), roleName))
                 else:
-                    print ('[', i, ']: ', role)
+                    print('[', i, ']: ', role)
                 i += 1
 
-            selectedroleindex = self.configure.input_and_set(config=self.config,section='msadfs',option='selectedroleindex',label='Selection')
+            selectedroleindex = self.configure.input_and_set(config=self.config, section='msadfs', option='selectedroleindex', label='Selection')
 
             # Basic sanity check of input
             if int(selectedroleindex) > (len(awsroles) - 1):
-                print ('You selected an invalid role index, please try again')
+                print('You selected an invalid role index, please try again')
                 sys.exit(0)
 
             role_arn = awsroles[int(selectedroleindex)].split(',')[0]
@@ -114,18 +112,18 @@ class AbstractADFS(object):
             RoleArn=role_arn,
             PrincipalArn=principal_arn,
             SAMLAssertion=assertion,
-            DurationSeconds=3600 # is currently the maximum
+            DurationSeconds=3600  # is currently the maximum
         )
 
         # Write the AWS STS token into the AWS credential file
-        filename = self.config.get('aws','credentials_file')
+        filename = self.config.get('aws', 'credentials_file')
 
         # Read in the existing config file
         awsconfig = configparser.RawConfigParser()
         awsconfig.read(filename)
 
         # We are using the specified profile in the config file to write the credentials
-        profile = self.config.get('provider','profile_name')
+        profile = self.config.get('provider', 'profile_name')
 
         if not awsconfig.has_section(profile):
             awsconfig.add_section(profile)
@@ -147,10 +145,25 @@ class AbstractADFS(object):
         with open(filename, 'w+') as configfile:
             awsconfig.write(configfile)
 
+        set_environment_variables = self.config.getboolean('aws', 'set_environment_variables')
+        # Check if we should set the system properties as well
+        if set_environment_variables:
+            with open(self.config.get('aws', 'environment_file'), 'w+') as environmentfile:
+                environmentfile.write('#!/bin/bash\n'
+                                      'export AWS_REGION={0}\n'
+                                      'export AWS_ACCESS_KEY_ID={1}\n'
+                                      'export AWS_SECRET_ACCESS_KEY={2}\n'
+                                      'export AWS_SESSION_TOKEN={3}\n'.format(self.config.get('aws', 'region'),
+                                                                              stsResponse['Credentials']['AccessKeyId'],
+                                                                              stsResponse['Credentials']['SecretAccessKey'],
+                                                                              stsResponse['Credentials']['SessionToken']))
+
         # Give the user some basic info as to what has just happened
-        print ('\n\n----------------------------------------------------------------')
-        print ('Your new access key pair has been stored in the AWS configuration file {0} under the {1} profile.'.format(filename, profile))
-        print ('Note that it will expire at {0}.'.format(stsResponse['Credentials']['Expiration']))
-        print ('After this time, you may safely rerun this script to refresh your access key pair.')
-        print ('To use this credential, call the AWS CLI with the --profile option (e.g. aws --profile saml ec2 describe-instances) unless you defined the default profile in configuration')
-        print ('----------------------------------------------------------------\n\n')
+        print('\n\n----------------------------------------------------------------')
+        print('Your new access key pair has been stored in the AWS configuration file {0} under the {1} profile for region {2}.'.format(filename, profile, self.config.get('aws', 'region')))
+        print('Note that it will expire at {0}.'.format(stsResponse['Credentials']['Expiration']))
+        print('After this time, you may safely rerun this script to refresh your access key pair.')
+        print('To use this credential, call the AWS CLI with the --profile option (e.g. aws --profile {0} ec2 describe-instances) unless you defined the default profile in configuration'.format(profile))
+        if set_environment_variables:
+            print('(UNIX/Mac Only) You can also use the environment variables in your shell with "source {0}"'.format(self.config.get('aws', 'environment_file')))
+        print('----------------------------------------------------------------\n\n')

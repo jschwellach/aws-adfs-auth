@@ -1,4 +1,4 @@
-"""
+'''
 Licensed to the Apache Software Foundation (ASF) under one
 or more contributor license agreements.  See the NOTICE file
 distributed with this work for additional information
@@ -15,7 +15,7 @@ software distributed under the License is distributed on an
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
-"""
+'''
 
 import os
 import configparser
@@ -38,7 +38,7 @@ class Configure(object):
         return config
 
     def check_config(self):
-        """ function to check if the configuration is set """
+        """Function to check if the configuration is set."""
         self.logger.debug('checking config folders and files')
         if not os.path.exists(self.aws_folder):
             os.makedirs(self.aws_folder)
@@ -56,18 +56,18 @@ class Configure(object):
         return True
 
     def store_config(self, config):
-        """ function to store the configuration """
+        """Function to store the configuration."""
         self.logger.debug("storing config file to %s" % self.aws_adfs_auth_config_file)
         with open(self.aws_adfs_auth_config_file, 'w+') as adfs_auth_config_file:
             config.write(adfs_auth_config_file)
 
     def setup_provider(self, config):
-        """ function to setup the provider """
-        print ("Please choose which ADFS provider you want to use (currently only Microsoft is supported)")
+        """Function to setup the provider."""
+        print("Please choose which ADFS provider you want to use (currently only Microsoft is supported)")
         if len(self.adfs_poviders) > 1:
             i = 0
             for adfs_provider in self.adfs_poviders:
-                print ('[{:2d}]: {:30s}'.format(i, adfs_provider))
+                print('[{:2d}]: {:30s}'.format(i, adfs_provider))
                 i += 1
             selected_provider_index = int(input('Selection: '))
         else:
@@ -77,23 +77,22 @@ class Configure(object):
         config.set('provider', 'name', self.adfs_poviders[selected_provider_index])
 
     def setup_idpentryurl(self, config):
-        """ function to setup the idp entry url """
+        """Function to setup the idp entry url."""
         self.logger.debug("setting up idp url")
-        print ("Please enter the ADFS provider enty URL for your configuration")
-        print ("Example: https://<provider>/adfs/ls/IdpInitiatedSignOn.aspx?loginToRp=urn:amazon:webservices")
+        print("Please enter the ADFS provider enty URL for your configuration")
+        print("Example: https://<provider>/adfs/ls/IdpInitiatedSignOn.aspx?loginToRp=urn:amazon:webservices")
         self.input_and_set(config=config, section='provider', option='idpentryurl', label='URL')
 
     def setup_profile_name(self, config):
-        """ function to setup the profile name to use for storing the credentials """
+        """Function to setup the profile name to use for storing the credentials."""
         self.logger.debug("setting up the profile name")
-        print ("Please enter the AWS profile you want to use for storing your credentials")
-        print ("If you use the default profile you don't need to specify the profile when executing AWS commands.")
-        print ("Make a backup of your default profile if you still need it.")
+        print("Please enter the AWS profile you want to use for storing your credentials")
+        print("If you use the default profile you don't need to specify the profile when executing AWS commands.")
+        print("Make a backup of your default profile if you still need it.")
         self.input_and_set(config=config, section='provider', option='profile_name', label='AWS Profile')
 
     def input_and_set(self, config, section, option, label):
-        """ function to ask for input and if the value is
-        already set it will use the same value on pressing enter """
+        """Function to ask for input and if the value is already set it will use the same value on pressing enter."""
         if not config.has_section(section):
             config.add_section(section)
         if config.has_option(section, option):
@@ -105,27 +104,27 @@ class Configure(object):
         return value
 
     def set_value(self, config, section, option, value):
-        """ function to set a value within the section """
+        """Function to set a value within the section."""
         if not config.has_section(section):
             config.add_section(section)
         if not config.has_option(section, option):
             config.set(section, option, value)
 
     def setup_variables(self, config):
-        """ function to setup additional variables """
-        print ("Please enter the AWS region")
+        """Function to setup additional variables."""
+        print("Please enter the AWS region")
         self.input_and_set(config=config, section='aws', option='region', label='Region')
         self.input_and_set(config=config, section='aws', option='outputformat', label='Output format')
 
     def setup_defaults(self, config):
-        """ function to setup defaults """
+        """Function to setup defaults."""
         self.set_value(config, 'aws', 'credentials_file', self.home + '/.aws/credentials')
         self.set_value(config, 'aws', 'sslverification', True)
-        self.set_value(config, 'info', 'version', '0.3.0')
+        self.set_value(config, 'info', 'version', '0.4.0')
         self.set_value(config, 'provider', 'profile_name', 'saml')
 
     def setup(self):
-        """ function to setup the configuration of adfs auth """
+        """Function to setup the configuration of adfs auth."""
         config = self.open_config()
         self.setup_provider(config)
         self.setup_idpentryurl(config)
@@ -140,8 +139,14 @@ class Configure(object):
         self.set_value(config, 'provider', 'profile_name', 'saml')
         self.store_config(config)
 
+    def migrate_030_040(self, config):
+        self.set_value(config, 'info', 'version', '0.4.0')
+        self.set_value(config, 'aws', 'set_environment_variables', False)
+        self.set_value(config, 'aws', 'environment_file', self.home + '/.aws/environment.sh')
+        self.store_config(config)
+
     def migrate(self, config):
-        """ function to migrate the configuration to the next version """
+        """Function to migrate the configuration to the next version."""
         self.logger.info('migrating configuration file to the latest version if necessary')
         # checking if config has a version number, if not we start to migrate from 0.2.0
         if not config.has_section('info'):
@@ -150,11 +155,14 @@ class Configure(object):
             version = '0.2.0'
         else:
             version = config.get('info', 'version')
-        if version == '0.3.0':
+        if version == '0.4.0':
             # all good, we are on the latest version
             self.logger.info('migration of configuration not necessary.')
         elif version == '0.2.0':
             self.logger.info('migrating configuration from 0.2.0 to 0.3.0')
             self.migrate_020_030(config)
+        elif version == '0.3.0':
+            self.logger.info('migrating configuration from 0.3.0 to 0.4.0')
+            self.migrate_030_040(config)
         else:
             raise Exception('configuration file corrupted, please re-configure application')
